@@ -1,4 +1,4 @@
-# Steganography Library
+# Steganography Library dev branch
 ---Note - this is a very early build, still very much in development---
 ## What is included in the library
 * SLFileInfo class
