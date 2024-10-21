@@ -5,6 +5,16 @@
 
     public static class SteganographyLib
     {
+        public class FileInfo
+        {
+            public string fileName { get; }
+            public byte[] data { get; }
+            public FileInfo(string fileName, byte[] data)
+            {
+                this.fileName = fileName;
+                this.data = data;
+            }
+        }           
         //Class to store a 6-bit number with useful methods.
         private class SixBit
         {
@@ -41,6 +51,11 @@
             public int getVal()
             {
                 return val;
+            }
+            //Add a number to the val
+            public void addToVal(int num)
+            {
+                setVal(num + val);
             }
             //Get the first two bits of the 6-bit number. Will be stored in the R value of a pixel.
             public int getRbits()
@@ -212,6 +227,51 @@
             }
             return [x, y];
         }
+        //Reads a single pixel into a SixBit object - returns the SixBit object and the co-ords of the next pixel.
+        static (SixBit, int[]) readPixel(SKBitmap bitmap, int[] coords)
+        {
+            int[] copy = new int[2];
+            Array.Copy(coords, copy, 2);
+            SixBit result = new SixBit();
+            SKColor pix = bitmap.GetPixel(coords[0], coords[1]);
+            result.addToVal((pix.Red & 3) << 4);
+            result.addToVal((pix.Green & 3) << 2);
+            result.addToVal(pix.Blue & 3);
+            copy.nextPixel(bitmap.Width, bitmap.Height);
+            return (result, copy);
+        }
+        //Reads a span of pixels into an array of SixBit objects - Returls the array of SixBits and the co-ords of the next pixel after the span.
+        static (SixBit[], int[]) readSpan(SKBitmap bitmap, int[] from, int numPixels)
+        {
+            int[] coords = new int[2];
+            Array.Copy(from, coords, 2);
+            SixBit[] result = new SixBit[numPixels];
+            for (int i = 0; i < numPixels; i++)
+            {
+                result[i] = readPixel(bitmap, coords).Item1;
+                coords.nextPixel(bitmap.Width, bitmap.Height);
+            }
+            return (result, coords);
+        }
+        //Returns an unsigned integer from an array of 6 or fewer SixBits. Assumes no padding to the right of the data.
+        static uint toUint(this SixBit[] sixBits)
+        {
+            if (sixBits.Length > 6)
+            {
+                throw new ArgumentException("Length of SixBit array must be <= 6");
+            }
+            uint result = 0;
+            for (int i = 0; i < sixBits.Length; i++)
+            {
+                result += (uint)sixBits[i].getVal() << (6 * (sixBits.Length - i - 1));
+            }
+            return result;
+        }
+        //Returns an array of bytes from an array of SixBits. Assumes padding to the right of the data.
+        static byte[] toByteArray(this SixBit[] sixBits)
+        {
+
+        }
         //Encode the file at 'filepath' into the image 'img'
         public static SKBitmap encode(SKBitmap img, string filePath)
         {
@@ -259,6 +319,7 @@
             {
                 throw new FileNotFoundException("filePath argument does not refer to an existing file.");
             }
+            SKBitmap copy = img.Copy();
             //Get the filename as a string and byte array, then get the data from the file as a byte array. Though you should typically never read a whole file into
             //memory, in this case it should be fine as the image itself takes up much more RAM than the file being written to it.
             //Essentially, this form of steganography only really works with relatively small files.
@@ -271,19 +332,25 @@
             //Encode the length of the filename into two sixbits.
             SixBit[] firstTwo = nameDataLength.toSixBits(2);
             //Store the width and height of the image as separate variables, just so that it is easier to use.
-            int width = img.Width;
-            int height = img.Height;
+            int width = copy.Width;
+            int height = copy.Height;
             //Set the starting co-ordinates to [0, 0] or the top-left pixel.
             int[] coords = [0, 0];
             //Write the first two SixBits to the image.
-            coords = firstTwo.writeToImage(img, coords);
+            coords = firstTwo.writeToImage(copy, coords);
             //Write the filename to the image.
-            coords = fileNameAsSixbits.writeToImage(img, coords);
+            coords = fileNameAsSixbits.writeToImage(copy, coords);
             SixBit[] fileDataAsSixbits = fileData.toSixBits();
             uint numPixels = (uint)fileDataAsSixbits.Length;
             SixBit[] numPixelsSixbits = numPixels.toSixBits(6);
-            coords = numPixelsSixbits.writeToImage(img, coords);
-            coords = fileDataAsSixbits.writeToImage(img, coords);
+            coords = numPixelsSixbits.writeToImage(copy, coords);
+            coords = fileDataAsSixbits.writeToImage(copy, coords);
+            return copy;
+        }        
+
+        public static FileInfo Decode(SKBitmap img)
+        {
+
         }
     }
 }
