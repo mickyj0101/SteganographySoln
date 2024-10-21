@@ -6,12 +6,12 @@
 
     public static class SteganographyLib
     {
-        //FileInfo class stores a filename and a byte array for the data of a file.
-        public class FileInfo
+        //SLFileInfo class stores a filename and a byte array for the data of a file.
+        public class SLFileInfo
         {
             public string fileName { get; }
             public byte[] data { get; }
-            public FileInfo(string fileName, byte[] data)
+            public SLFileInfo(string fileName, byte[] data)
             {
                 this.fileName = fileName;
                 this.data = data;
@@ -28,7 +28,7 @@
             {
                 if (val < 0 || val > 63)
                 {
-                    throw new ArgumentOutOfRangeException("'val' parameter must be between 0 and 63");
+                    throw new ArgumentOutOfRangeException("'val' parameter must be between 0 and 63. Was " + val.ToString());
                 }
                 this.val = val;
             }
@@ -36,7 +36,7 @@
             {
                 if (val > 63)
                 {
-                    throw new ArgumentOutOfRangeException("'val' parameter must be between 0 and 63");
+                    throw new ArgumentOutOfRangeException("'val' parameter must be between 0 and 63. Was " + val.ToString());
                 }
                 this.val = (int)val;
             }
@@ -45,7 +45,7 @@
             {
                 if (newVal < 0 || newVal > 63)
                 {
-                    throw new ArgumentOutOfRangeException("'newVal' parameter must be between 0 and 63");
+                    throw new ArgumentOutOfRangeException("'newVal' parameter must be between 0 and 63. Was " + val.ToString());
                 }
                 val = newVal;
             }
@@ -77,24 +77,50 @@
             //Write data to a pixel
             public void writeToPixel(SKBitmap map, int x, int y)
             {
-                //Get the pixel being written to
-                SKColor pix = map.GetPixel(x, y);
-                //Get the r, g and b values to modify them
-                byte r = pix.Red;
-                byte g = pix.Green;
-                byte b = pix.Blue;
-                //Use bitwise AND with ~3 to set the final two bits to 0, then use bitwise OR to set the final two bits to the bits for that colour, for each colour.
-                r = (byte)((r & ~3) | getRbits());
-                g = (byte)((g & ~3) | getGbits());
-                b = (byte)((b & ~3) | getBbits());
-                //Set the pixel to a pixel with the new r, g and b values.
-                map.SetPixel(x, y, new SKColor(r, g, b, pix.Alpha));
+                if (x == 0 && y == 0) 
+                {
+                    Console.WriteLine("Writing to 0, 0");
+                    Console.WriteLine(Convert.ToString(val, 2));
+                    //Get the pixel being written to
+                    SKColor pix = map.GetPixel(x, y);
+                    //Get the r, g and b values to modify them
+                    byte r = pix.Red;
+                    byte g = pix.Green;
+                    byte b = pix.Blue;
+                    Console.WriteLine(Convert.ToString(r, 2));
+                    Console.WriteLine(Convert.ToString(g, 2));
+                    Console.WriteLine(Convert.ToString(b, 2));
+                    //Use bitwise AND with ~3 to set the final two bits to 0, then use bitwise OR to set the final two bits to the bits for that colour, for each colour.
+                    r = (byte)((r & ~3) | getRbits());
+                    Console.WriteLine(Convert.ToString(r, 2));
+                    g = (byte)((g & ~3) | getGbits());
+                    Console.WriteLine(Convert.ToString(g, 2));
+                    b = (byte)((b & ~3) | getBbits());
+                    Console.WriteLine(Convert.ToString(b, 2));
+                    //Set the pixel to a pixel with the new r, g and b values.
+                    map.SetPixel(x, y, new SKColor(r, g, b, pix.Alpha));
+                }
+                else
+                {
+                    //Get the pixel being written to
+                    SKColor pix = map.GetPixel(x, y);
+                    //Get the r, g and b values to modify them
+                    byte r = pix.Red;
+                    byte g = pix.Green;
+                    byte b = pix.Blue;
+                    //Use bitwise AND with ~3 to set the final two bits to 0, then use bitwise OR to set the final two bits to the bits for that colour, for each colour.
+                    r = (byte)((r & ~3) | getRbits());
+                    g = (byte)((g & ~3) | getGbits());
+                    b = (byte)((b & ~3) | getBbits());
+                    //Set the pixel to a pixel with the new r, g and b values.
+                    map.SetPixel(x, y, new SKColor(r, g, b, pix.Alpha));
+                }
             }
             public void writeToPixel(SKBitmap map, int[] coords)
             {
                 if (coords.Length != 2)
                 {
-                    throw new ArgumentException("'coords' argument must have length = 2");
+                    throw new ArgumentException("'coords' argument must have length = 2. Had length = " + coords.Length.ToString());
                 }
                 writeToPixel(map, coords[0], coords[1]);
             }
@@ -108,7 +134,7 @@
             Array.Copy(startCoords, currentCoords, startCoords.Length);
             foreach (SixBit pix in data)
             {
-                pix.writeToPixel(map, startCoords);
+                pix.writeToPixel(map, currentCoords);
                 try
                 {
                     currentCoords.nextPixel(map.Width, map.Height);
@@ -122,7 +148,8 @@
         }
         //Gets a byte array as SixBits.
         static SixBit[] toSixBits(this byte[] data)
-        {           
+        {
+            bool littleEndian = BitConverter.IsLittleEndian;
             //Get the number of bytes in the data
             int len = data.Length;
             //Create an array of SixBits, with length equal to the ceiling of len * 8 / 6f (which is the number of SixBits that will be in the resulting array.)
@@ -134,8 +161,12 @@
             while (i < len - 2) 
             {
                 byte[] someBytes = { 0, data[i], data[i + 1], data[i + 2] };
+                if (littleEndian)
+                {
+                    Array.Reverse(someBytes);
+                }
                 //Convert the set of three bytes to an integer for easier access.
-                int threeBytes = BitConverter.ToInt32(someBytes, 0);
+                uint threeBytes = (uint)BitConverter.ToInt32(someBytes, 0);               
                 //Set the next 4 values of the result array to the next 4 sets of 6 bits.
                 result[x] = new SixBit(threeBytes >> 18);
                 result[x + 1] = new SixBit((threeBytes >> 12) & 63);
@@ -386,7 +417,7 @@
             byte[] fileData = File.ReadAllBytes(filePath);
             //Get the filename data as an array of SixBits.
             SixBit[] fileNameAsSixbits = nameData.toSixBits();
-            uint nameDataLength = (uint)nameData.Length;
+            uint nameDataLength = (uint)fileNameAsSixbits.Length;
             //Encode the length of the filename into two sixbits.
             SixBit[] firstTwo = nameDataLength.toSixBits(2);
             //Store the width and height of the image as separate variables, just so that it is easier to use.
@@ -396,6 +427,7 @@
             int[] coords = [0, 0];
             //Write the first two SixBits to the image.
             coords = firstTwo.writeToImage(copy, coords);
+            Console.WriteLine(readPixel(copy, [0, 0]).Item1.getVal());
             //Write the filename to the image.
             coords = fileNameAsSixbits.writeToImage(copy, coords);
             //Get the file data as sixbits
@@ -409,9 +441,10 @@
             coords = fileDataAsSixbits.writeToImage(copy, coords);
             return copy;
         }        
-        //Decode an image into a FileInfo (which contains a string for the filename and a byte array for the data.)
-        public static FileInfo Decode(SKBitmap img)
+        //Decode an image into a SLFileInfo (which contains a string for the filename and a byte array for the data.)
+        public static SLFileInfo Decode(SKBitmap img)
         {
+            Console.WriteLine(readPixel(img, [0, 0]).Item1.getVal());
             //Set the current co-ords to (0, 0)
             int[] currentPos = [0, 0];
             //Read the first two pixels and update co-ords
@@ -436,7 +469,7 @@
             //Get the filename as a string
             string fileName = Encoding.UTF8.GetString(fileNameBytes);
             //Return the filename and the data.
-            return new FileInfo(fileName, dataBytes);
+            return new SLFileInfo(fileName, dataBytes);
         }
     }
 }
