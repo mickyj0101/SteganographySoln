@@ -1,10 +1,12 @@
 ﻿namespace SteganographyLibrary
 {
     using SkiaSharp;
+    using System.Diagnostics;
     using System.Text;
 
     public static class SteganographyLib
     {
+        //FileInfo class stores a filename and a byte array for the data of a file.
         public class FileInfo
         {
             public string fileName { get; }
@@ -267,10 +269,66 @@
             }
             return result;
         }
+        static uint toUint(this SixBit[] sixBits, int start, int length)
+        {
+            if (length > 6)
+            {
+                throw new ArgumentException("specified range must be <= 6 in length");
+            }
+            uint result = 0;
+            for (int i = start; i < start + length; i++)
+            {
+                result += (uint)sixBits[i].getVal() << (6 * (start + length - 1 - i));
+            }
+            return result;
+        }
         //Returns an array of bytes from an array of SixBits. Assumes padding to the right of the data.
         static byte[] toByteArray(this SixBit[] sixBits)
         {
-
+            //Get the number of bits appended
+            int appendedBits = 0;
+            float testVal = sixBits.Length * 0.75f;
+            if (testVal != Math.Floor(testVal))
+            {
+                appendedBits += 2;
+                testVal -= 0.25f;
+                if (testVal != Math.Floor(testVal))
+                {
+                    appendedBits += 2;
+                }
+            }
+            //i is the position in the SixBit array. x is the position in the byte array.
+            int i = 0;
+            int x = 0;
+            //Create result array.
+            byte[] result = new byte[((sixBits.Length * 6) - appendedBits) / 8];
+            //Read in groups of 4 SixBits (3 bytes) until there are fewer than 4 remaining.
+            while (i < sixBits.Length - 3)
+            {
+                //Read 4 sixbits into a uint value
+                uint threeBytes = sixBits.toUint(i, 4);
+                //Set result[x], result[x + 1] and result[x + 2] to the bytes in the uint.
+                result[x] = (byte)(threeBytes >> 16);
+                result[x + 1] = (byte)((threeBytes >> 8) & 0xFF);
+                result[x + 2] = (byte)(threeBytes & 0xFF);
+                //Increment i and x
+                x += 3;
+                i += 4;
+            }
+            //Find remaining number of SixBits.
+            int remainingSixBits = sixBits.Length - i;
+            //Get the last remaining bytes from the SixBit array.
+            uint lastBytes = sixBits.toUint(i, remainingSixBits);
+            //Remove the appended bits.
+            lastBytes >>= appendedBits;
+            //Get the number of bytes in the lastBytes variable
+            int numBytes = ((remainingSixBits * 6) - appendedBits) / 8;
+            //Read these bytes into the last part of the result array
+            for (int j = numBytes - 1; j >= 0; j--)
+            {
+                result[x + j] = (byte)((lastBytes >> 8 * (numBytes - j - 1)) & 0xFF);
+            }
+            return result;
         }
         //Encode the file at 'filepath' into the image 'img'
         public static SKBitmap encode(SKBitmap img, string filePath)
@@ -340,17 +398,45 @@
             coords = firstTwo.writeToImage(copy, coords);
             //Write the filename to the image.
             coords = fileNameAsSixbits.writeToImage(copy, coords);
+            //Get the file data as sixbits
             SixBit[] fileDataAsSixbits = fileData.toSixBits();
+            //Work out how many pixels are needed to store the file data
             uint numPixels = (uint)fileDataAsSixbits.Length;
+            //Get the number of pixels to store the file data as a SixBit array
             SixBit[] numPixelsSixbits = numPixels.toSixBits(6);
+            //Write the number of pixels, then the file data, to the image.
             coords = numPixelsSixbits.writeToImage(copy, coords);
             coords = fileDataAsSixbits.writeToImage(copy, coords);
             return copy;
         }        
-
+        //Decode an image into a FileInfo (which contains a string for the filename and a byte array for the data.)
         public static FileInfo Decode(SKBitmap img)
         {
-
+            //Set the current co-ords to (0, 0)
+            int[] currentPos = [0, 0];
+            //Read the first two pixels and update co-ords
+            (SixBit[], int[]) FirstTwo = readSpan(img, currentPos, 2);
+            currentPos = FirstTwo.Item2;
+            //Get the number of pixels to store the filename
+            uint numPixelsForFilename = FirstTwo.Item1.toUint();
+            //Read the pixels storing the filename and update co-ords.
+            (SixBit[], int[]) fileNameData = readSpan(img, currentPos, (int)numPixelsForFilename);
+            currentPos = fileNameData.Item2;
+            //Get the data for the filename in a byte array
+            byte[] fileNameBytes = fileNameData.Item1.toByteArray();
+            //Read the next 6 pixels and update co-ords
+            (SixBit[], int[]) dataData = readSpan(img, currentPos, 6);
+            currentPos = dataData.Item2;
+            //Get the number of pixels used to store actual data.
+            uint numPixelsForData = dataData.Item1.toUint();
+            //read the pixels storing actual data
+            (SixBit[], int[]) data = readSpan(img, currentPos, (int)numPixelsForData);
+            //Get the data as a byte array
+            byte[] dataBytes = data.Item1.toByteArray();
+            //Get the filename as a string
+            string fileName = Encoding.UTF8.GetString(fileNameBytes);
+            //Return the filename and the data.
+            return new FileInfo(fileName, dataBytes);
         }
     }
 }
