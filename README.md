@@ -34,3 +34,9 @@
 * returns SLFileInfo
   * this has the filename of the decoded file, and the byte array of the file.
 ___
+The SteganographyTest folder is a quick program which allows for use of the library. Use it from the command line with these arguments:
+To encode:
+SteganographyTest.exe enc \<File Path\> \<Image Path\> \<Output Directory\>
+
+To decode:
+SteganographyTest.exe dec \<Image path\> \<Output Directory\>
