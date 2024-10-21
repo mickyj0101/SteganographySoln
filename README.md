@@ -1,4 +1,36 @@
-# IN DEVELOPMENT
-## Information will go here
-This is going to be a c# project which can perform steganography, but is still in development.
-Uses .NET 8.0
+# Steganography Library
+---Note - this is a very early build, still very much in development---
+## What is included in the library
+* SLFileInfo class
+* encode method
+* decode method
+
+## SLFileInfo class:
+* Used to hold data for a file; is the output of the decode method.
+* Has two read-only attributes: fileName, data
+* fileName
+  * Type: string
+  * Stores the file name of the file referred to by the SLFileInfo class
+* data
+  * Type: byte[]
+  * Stores the data for the file in a byte array
+
+## encode method
+* Takes two parameters: img and filePath
+* img
+  * type: SKBitmap
+  * is a bitmap of the image you want to encode the file to
+* filepath
+  * type: string
+  * is the path for the file you want to encode into the image
+* returns SKBitmap
+  * this is the image with the data encoded.
+
+## decode method
+* Takes one parameter: img
+* img
+  * type: SKBitmap
+  * is the image you want to decode the file from.
+* returns SLFileInfo
+  * this has the filename of the decoded file, and the byte array of the file.
+___
