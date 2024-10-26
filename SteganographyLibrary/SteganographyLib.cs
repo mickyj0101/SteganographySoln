@@ -79,24 +79,16 @@
             {
                 if (x == 0 && y == 0) 
                 {
-                    Console.WriteLine("Writing to 0, 0");
-                    Console.WriteLine(Convert.ToString(val, 2));
                     //Get the pixel being written to
                     SKColor pix = map.GetPixel(x, y);
                     //Get the r, g and b values to modify them
                     byte r = pix.Red;
                     byte g = pix.Green;
                     byte b = pix.Blue;
-                    Console.WriteLine(Convert.ToString(r, 2));
-                    Console.WriteLine(Convert.ToString(g, 2));
-                    Console.WriteLine(Convert.ToString(b, 2));
                     //Use bitwise AND with ~3 to set the final two bits to 0, then use bitwise OR to set the final two bits to the bits for that colour, for each colour.
                     r = (byte)((r & ~3) | getRbits());
-                    Console.WriteLine(Convert.ToString(r, 2));
                     g = (byte)((g & ~3) | getGbits());
-                    Console.WriteLine(Convert.ToString(g, 2));
                     b = (byte)((b & ~3) | getBbits());
-                    Console.WriteLine(Convert.ToString(b, 2));
                     //Set the pixel to a pixel with the new r, g and b values.
                     map.SetPixel(x, y, new SKColor(r, g, b, pix.Alpha));
                 }
@@ -166,7 +158,7 @@
                     Array.Reverse(someBytes);
                 }
                 //Convert the set of three bytes to an integer for easier access.
-                uint threeBytes = (uint)BitConverter.ToInt32(someBytes, 0);               
+                int threeBytes = BitConverter.ToInt32(someBytes, 0);               
                 //Set the next 4 values of the result array to the next 4 sets of 6 bits.
                 result[x] = new SixBit(threeBytes >> 18);
                 result[x + 1] = new SixBit((threeBytes >> 12) & 63);
@@ -188,7 +180,7 @@
             }
             else
             {
-                result[x + 1] = new SixBit(((data[i] & 3) << 4) + data[i + 1] >> 4);
+                result[x + 1] = new SixBit(((data[i] & 3) << 4) + (data[i + 1] >> 4));
                 result[x + 2] = new SixBit((data[i + 1] & 15) << 2);
                 return result;
             }
@@ -197,12 +189,12 @@
         //Extension method to get an int as an array of sixbits. If the 'numSixBits' parameter is 0 or blank, then it will return the minimum number of sixbits.
         //Otherwise, it will return that many sixbits. NOTE - it will not throw an error if the number specified is fewer than would be required to fit the data.
         //It will get the final 'numSixBits' SixBits of the integer.
-        static SixBit[] toSixBits(this uint value, int numSixBits = 0)
+        static SixBit[] toSixBits(this int value, int numSixBits = 0)
         {
             if (numSixBits < 0) throw new ArgumentOutOfRangeException("'numSixBits' argument must be 0 or greater");
             if (numSixBits == 0)
             {
-                uint temp = value;
+                int temp = value;
                 while (temp > 0)
                 {
                     numSixBits++;
@@ -220,10 +212,10 @@
                 }
                 if (pushLeft == 30)
                 {
-                    result[numSixBits - (i + 1)] = new SixBit((value & ((uint)3 << 30)) >> 30);
+                    result[numSixBits - (i + 1)] = new SixBit((value & (3 << 30)) >> 30);
                     continue;
                 }
-                result[numSixBits - (i + 1)] = new SixBit((value & ((uint)63 << pushLeft)) >> pushLeft);
+                result[numSixBits - (i + 1)] = new SixBit((value & (63 << pushLeft)) >> pushLeft);
             }
             return result;
 
@@ -287,29 +279,29 @@
             return (result, coords);
         }
         //Returns an unsigned integer from an array of 6 or fewer SixBits. Assumes no padding to the right of the data.
-        static uint toUint(this SixBit[] sixBits)
+        static int toInt(this SixBit[] sixBits)
         {
             if (sixBits.Length > 6)
             {
                 throw new ArgumentException("Length of SixBit array must be <= 6");
             }
-            uint result = 0;
+            int result = 0;
             for (int i = 0; i < sixBits.Length; i++)
             {
-                result += (uint)sixBits[i].getVal() << (6 * (sixBits.Length - i - 1));
+                result += sixBits[i].getVal() << (6 * (sixBits.Length - i - 1));
             }
             return result;
         }
-        static uint toUint(this SixBit[] sixBits, int start, int length)
+        static int toInt(this SixBit[] sixBits, int start, int length)
         {
             if (length > 6)
             {
                 throw new ArgumentException("specified range must be <= 6 in length");
             }
-            uint result = 0;
+            int result = 0;
             for (int i = start; i < start + length; i++)
             {
-                result += (uint)sixBits[i].getVal() << (6 * (start + length - 1 - i));
+                result += sixBits[i].getVal() << (6 * (start + length - 1 - i));
             }
             return result;
         }
@@ -336,9 +328,9 @@
             //Read in groups of 4 SixBits (3 bytes) until there are fewer than 4 remaining.
             while (i < sixBits.Length - 3)
             {
-                //Read 4 sixbits into a uint value
-                uint threeBytes = sixBits.toUint(i, 4);
-                //Set result[x], result[x + 1] and result[x + 2] to the bytes in the uint.
+                //Read 4 sixbits into an int value
+                int threeBytes = sixBits.toInt(i, 4);
+                //Set result[x], result[x + 1] and result[x + 2] to the bytes in the int.
                 result[x] = (byte)(threeBytes >> 16);
                 result[x + 1] = (byte)((threeBytes >> 8) & 0xFF);
                 result[x + 2] = (byte)(threeBytes & 0xFF);
@@ -349,7 +341,7 @@
             //Find remaining number of SixBits.
             int remainingSixBits = sixBits.Length - i;
             //Get the last remaining bytes from the SixBit array.
-            uint lastBytes = sixBits.toUint(i, remainingSixBits);
+            int lastBytes = sixBits.toInt(i, remainingSixBits);
             //Remove the appended bits.
             lastBytes >>= appendedBits;
             //Get the number of bytes in the lastBytes variable
@@ -417,9 +409,8 @@
             byte[] fileData = File.ReadAllBytes(filePath);
             //Get the filename data as an array of SixBits.
             SixBit[] fileNameAsSixbits = nameData.toSixBits();
-            uint nameDataLength = (uint)fileNameAsSixbits.Length;
             //Encode the length of the filename into two sixbits.
-            SixBit[] firstTwo = nameDataLength.toSixBits(2);
+            SixBit[] firstTwo = fileNameAsSixbits.Length.toSixBits(2);
             //Store the width and height of the image as separate variables, just so that it is easier to use.
             int width = copy.Width;
             int height = copy.Height;
@@ -427,15 +418,12 @@
             int[] coords = [0, 0];
             //Write the first two SixBits to the image.
             coords = firstTwo.writeToImage(copy, coords);
-            Console.WriteLine(readPixel(copy, [0, 0]).Item1.getVal());
             //Write the filename to the image.
             coords = fileNameAsSixbits.writeToImage(copy, coords);
             //Get the file data as sixbits
             SixBit[] fileDataAsSixbits = fileData.toSixBits();
-            //Work out how many pixels are needed to store the file data
-            uint numPixels = (uint)fileDataAsSixbits.Length;
             //Get the number of pixels to store the file data as a SixBit array
-            SixBit[] numPixelsSixbits = numPixels.toSixBits(6);
+            SixBit[] numPixelsSixbits = fileDataAsSixbits.Length.toSixBits(6);
             //Write the number of pixels, then the file data, to the image.
             coords = numPixelsSixbits.writeToImage(copy, coords);
             coords = fileDataAsSixbits.writeToImage(copy, coords);
@@ -444,16 +432,15 @@
         //Decode an image into a SLFileInfo (which contains a string for the filename and a byte array for the data.)
         public static SLFileInfo Decode(SKBitmap img)
         {
-            Console.WriteLine(readPixel(img, [0, 0]).Item1.getVal());
             //Set the current co-ords to (0, 0)
             int[] currentPos = [0, 0];
             //Read the first two pixels and update co-ords
             (SixBit[], int[]) FirstTwo = readSpan(img, currentPos, 2);
             currentPos = FirstTwo.Item2;
             //Get the number of pixels to store the filename
-            uint numPixelsForFilename = FirstTwo.Item1.toUint();
+            int numPixelsForFilename = FirstTwo.Item1.toInt();
             //Read the pixels storing the filename and update co-ords.
-            (SixBit[], int[]) fileNameData = readSpan(img, currentPos, (int)numPixelsForFilename);
+            (SixBit[], int[]) fileNameData = readSpan(img, currentPos, numPixelsForFilename);            
             currentPos = fileNameData.Item2;
             //Get the data for the filename in a byte array
             byte[] fileNameBytes = fileNameData.Item1.toByteArray();
@@ -461,9 +448,9 @@
             (SixBit[], int[]) dataData = readSpan(img, currentPos, 6);
             currentPos = dataData.Item2;
             //Get the number of pixels used to store actual data.
-            uint numPixelsForData = dataData.Item1.toUint();
+            int numPixelsForData = dataData.Item1.toInt();
             //read the pixels storing actual data
-            (SixBit[], int[]) data = readSpan(img, currentPos, (int)numPixelsForData);
+            (SixBit[], int[]) data = readSpan(img, currentPos, numPixelsForData);
             //Get the data as a byte array
             byte[] dataBytes = data.Item1.toByteArray();
             //Get the filename as a string
